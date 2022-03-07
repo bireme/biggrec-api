@@ -1,0 +1,9 @@
+FROM redis:6.2-alpine
+
+# copy base requirements
+COPY ./bigg-rec-ids.csv /data.csv
+
+ENTRYPOINT nohup /bin/sh -c "redis-server" & sleep 5s \
+    && cat /data.csv | awk -F',' '{print " SET \""$1"\" \""$2"\" \n"}' | redis-cli --pipe \
+    && tail -f /dev/null
+

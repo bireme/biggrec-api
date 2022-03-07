@@ -1,0 +1,73 @@
+version: '3.4'
+
+services:
+  cache:
+    container_name: biggrec-redis
+    restart: unless-stopped
+    build:
+        context: .
+        dockerfile: Dockerfile-redis
+    expose:
+      - 6379
+    volumes:
+      - redis_data:/data
+    networks:
+      - nginx-proxy
+    deploy:
+      resources:
+        limits:
+          memory: ${MEMORY_CACHE_LIMIT}
+        reservations:
+          memory: ${MEMORY_CACHE_RESERVATION}
+
+  biggrec_api:
+    container_name: biggrec-api
+    restart: unless-stopped
+    build:
+      context: .
+      target: prod
+    image: ${IMAGE_TAG}
+    expose:
+        - 8080
+    depends_on:
+        - cache
+    networks:
+        - nginx-proxy
+    command: gunicorn -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:8000 ${COMMAND_PARAMS}
+    deploy:
+      resources:
+        limits:
+          memory: ${MEMORY_APP_LIMIT}
+        reservations:
+          memory: ${MEMORY_APP_RESERVATION}
+
+
+  www:
+    container_name: bigrec-webserver
+    restart: unless-stopped
+    image: nginx:1.18-alpine
+    expose:
+      - 80
+    volumes:
+      - ./conf/nginx:/etc/nginx/conf.d
+      - ${LOG_PATH}:/var/log/nginx
+    depends_on:
+      - biggrec_api
+    environment:
+      - VIRTUAL_HOST=${VIRTUAL_HOST}
+      - LETSENCRYPT_HOST=${LETSENCRYPT_HOST}
+    networks:
+      - nginx-proxy
+    deploy:
+      resources:
+        limits:
+          memory: ${MEMORY_WEBSERVER_LIMIT}
+        reservations:
+          memory: ${MEMORY_WEBSERVER_RESERVATION}
+
+networks:
+  nginx-proxy:
+    external: true
+
+volumes:
+  redis_data:

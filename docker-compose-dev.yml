@@ -1,0 +1,36 @@
+version: '3.4'
+
+services:
+  cache:
+    container_name: biggrec-redis
+    restart: unless-stopped
+    build:
+        context: .
+        dockerfile: Dockerfile-redis
+    expose:
+      - 6379
+    volumes:
+      - redis_data:/data
+    networks:
+      - nginx-proxy
+
+  app:
+      container_name: biggrec-api
+      restart: unless-stopped
+      build: .
+      expose:
+          - 8080
+      volumes:
+          - ./app/:/app/
+      depends_on:
+          - cache
+      networks:
+          - nginx-proxy
+      command: uvicorn main:app --host 0.0.0.0 --port 8080 --reload ${COMMAND_PARAMS}
+
+networks:
+  nginx-proxy:
+    external: true
+
+volumes:
+  redis_data:
